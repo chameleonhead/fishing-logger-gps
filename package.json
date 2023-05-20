@@ -1,0 +1,15 @@
+{
+  "name": "fishing-logger-gps",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "Yuto Nagano",
+  "license": "MIT",
+  "dependencies": {
+    "serialport": "^11.0.0"
+  }
+}
