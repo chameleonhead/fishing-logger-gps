@@ -1,5 +1,6 @@
 import { ReadlineParser, SerialPort } from "serialport";
 import fs from 'fs'
+import { setTimeout } from 'timers/promises';
 
 function textWriter() {
     let currentOutpuStream = null;
@@ -96,6 +97,7 @@ async function main() {
     for (; ;) {
         try {
             await readSerial(writer, { path: 'COM5' });
+            await setTimeout(1000);
         } catch (err) {
             console.error(err);
         }
