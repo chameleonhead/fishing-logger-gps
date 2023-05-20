@@ -48,33 +48,58 @@ function textWriter() {
     });
 }
 
+async function readSerial(writer, { path }) {
+    return new Promise(async (resolve, reject) => {
+        const ports = await SerialPort.list();
+        for (let i = 0; i < ports.length; i++) {
+            const item = ports[i];
+            if (item.path === path) {
+                const port = new SerialPort({
+                    path,
+                    baudRate: 9600,
+                });
+
+                port.on('close', (reason) => {
+                    reject(reason)
+                });
+                port.on('error', (reason) => {
+                    reject(reason)
+                });
+                const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }))
+                parser.on('data', (data) => {
+                    writer.write(data);
+                });
+                parser.on('error', (error) => {
+                    console.log(error)
+                })
+                return;
+            }
+        }
+        resolve();
+    })
+
+}
+
 async function main() {
-    const ports = await SerialPort.list();
-
-    const port = new SerialPort({
-        path: ports[2].path,
-        baudRate: 9600,
-    });
-
-    const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }))
     const stream = textWriter();
     const writer = stream.getWriter();
-    parser.on('data', (data) => {
-        writer.write(data);
-    });
-
     process.on('SIGHUP', () => {
         stream.close();
-        clearInterval(id);
     })
     process.on('SIGINT', () => {
         stream.close();
-        clearInterval(id);
     })
     process.on("SIGTERM", () => {
         stream.close();
-        clearInterval(id);
     });
+
+    for (; ;) {
+        try {
+            await readSerial(writer, { path: 'COM5' });
+        } catch (err) {
+            console.error(err);
+        }
+    }
 }
 
 main();
