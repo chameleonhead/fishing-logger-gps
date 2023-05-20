@@ -1,3 +1,4 @@
+import dotenv from 'dotenv';
 import { ReadlineParser, SerialPort } from "serialport";
 import fs from 'fs'
 import { setTimeout } from 'timers/promises';
@@ -82,6 +83,8 @@ async function readSerial(writer, { path }) {
 }
 
 async function main() {
+    dotenv.config();
+
     const stream = textWriter();
     const writer = stream.getWriter();
     process.on('SIGHUP', () => {
@@ -96,7 +99,7 @@ async function main() {
 
     for (; ;) {
         try {
-            await readSerial(writer, { path: 'COM5' });
+            await readSerial(writer, { path: process.env.SERIAL_PORT_PATH });
             await setTimeout(1000);
         } catch (err) {
             console.error(err);
