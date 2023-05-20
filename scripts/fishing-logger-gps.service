@@ -6,11 +6,9 @@ Type=simple
 WorkingDirectory=/home/fishing/source/repos/fishing-logger-gps
 Environment=SERIAL_PORT_PATH=/dev/ttyUSB0
 ExecStart=/usr/bin/node /home/fishing/source/repos/fishing-logger-gps/src/index.js
-ExecStop=/usr/bin/pkill -e node
+ExecStop=/bin/kill -HUP $MAINPID
 Restart=always
-RestartSec=2
-StandardOutput=journal
-StandardError=journal
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
