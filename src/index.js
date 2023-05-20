@@ -1,7 +1,12 @@
 import dotenv from 'dotenv';
 import { ReadlineParser, SerialPort } from "serialport";
 import fs from 'fs'
-import { setTimeout } from 'timers/promises';
+
+function sleep(milliseconds) {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => resolve(), milliseconds);
+    })
+}
 
 function textWriter() {
     let currentOutpuStream = null;
@@ -52,32 +57,35 @@ function textWriter() {
 
 async function readSerial(writer, { path }) {
     return new Promise(async (resolve, reject) => {
-        const ports = await SerialPort.list();
-        for (let i = 0; i < ports.length; i++) {
-            const item = ports[i];
-            if (item.path === path) {
-                const port = new SerialPort({
-                    path,
-                    baudRate: 9600,
-                });
+        try {
+            const ports = await SerialPort.list();
+            for (let i = 0; i < ports.length; i++) {
+                const item = ports[i];
+                if (item.path === path) {
+                    const port = new SerialPort({
+                        path,
+                        baudRate: 9600,
+                    });
 
-                port.on('close', (reason) => {
-                    reject(reason)
-                });
-                port.on('error', (reason) => {
-                    reject(reason)
-                });
-                const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }))
-                parser.on('data', (data) => {
-                    writer.write(data);
-                });
-                parser.on('error', (error) => {
-                    console.log(error)
-                })
-                return;
+                    port.on('close', (reason) => {
+                        reject(reason)
+                    });
+                    port.on('error', (reason) => {
+                        reject(reason)
+                    });
+                    const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }))
+                    parser.on('data', (data) => {
+                        writer.write(data);
+                    });
+                    parser.on('error', (error) => {
+                        console.log(error)
+                    })
+                    return;
+                }
             }
+        } catch (err) {
+            reject(err);
         }
-        resolve();
     })
 
 }
@@ -100,7 +108,7 @@ async function main() {
     for (; ;) {
         try {
             await readSerial(writer, { path: process.env.SERIAL_PORT_PATH });
-            await setTimeout(1000);
+            await sleep(1000);
         } catch (err) {
             console.error(err);
         }

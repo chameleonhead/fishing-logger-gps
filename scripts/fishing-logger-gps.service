@@ -1,0 +1,16 @@
+[Unit]
+Description= Fishing Logger GPS Tracker
+
+[Service]
+Type=simple
+WorkingDirectory=/home/fishing/source/repos/fishing-logger-gps
+Environment=SERIAL_PORT_PATH=/dev/ttyUSB0
+ExecStart=/usr/bin/node /home/fishing/source/repos/fishing-logger-gps/src/index.js
+ExecStop=/usr/bin/pkill -e node
+Restart=always
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
