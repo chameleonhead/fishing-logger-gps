@@ -55,7 +55,7 @@ function textWriter() {
     });
 }
 
-async function readSerial(writer, { path }) {
+async function readSerial(writer, { path, signal }) {
     return new Promise(async (resolve, reject) => {
         try {
             const ports = await SerialPort.list();
@@ -67,15 +67,24 @@ async function readSerial(writer, { path }) {
                         baudRate: 9600,
                     });
 
+                    signal.on('abort', () => {
+                        port.close();
+                    })
+
+                    let closed = false;
                     port.on('close', (reason) => {
-                        reject(reason)
+                        resolve(reason)
+                        closed = true;
                     });
+
                     port.on('error', (reason) => {
                         reject(reason)
                     });
                     const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }))
                     parser.on('data', (data) => {
-                        writer.write(data);
+                        if (!closed) {
+                            writer.write(data);
+                        }
                     });
                     parser.on('error', (error) => {
                         console.log(error)
@@ -83,6 +92,7 @@ async function readSerial(writer, { path }) {
                     return;
                 }
             }
+            resolve()
         } catch (err) {
             reject(err);
         }
@@ -93,21 +103,26 @@ async function readSerial(writer, { path }) {
 async function main() {
     dotenv.config();
 
+    const controller = new AbortController();
     const stream = textWriter();
     const writer = stream.getWriter();
-    process.on('SIGHUP', () => {
+    let finished = false;
+    function handleFinish() {
+        controller.abort();
+        writer.releaseLock();
         stream.close();
-    })
-    process.on('SIGINT', () => {
-        stream.close();
-    })
-    process.on("SIGTERM", () => {
-        stream.close();
-    });
+        finished = true;
+    }
+    process.on('SIGHUP', handleFinish)
+    process.on('SIGINT', handleFinish)
+    process.on("SIGTERM", handleFinish);
 
     for (; ;) {
         try {
-            await readSerial(writer, { path: process.env.SERIAL_PORT_PATH });
+            await readSerial(writer, { path: process.env.SERIAL_PORT_PATH, signal: controller.signal });
+            if (finished) {
+                return;
+            }
             await sleep(1000);
         } catch (err) {
             console.error(err);
