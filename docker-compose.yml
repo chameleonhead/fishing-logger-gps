@@ -1,0 +1,6 @@
+version: '3'
+services:
+  signalk-server:
+    build: ./docker
+    volumes:
+    - ./docker/config:/root/.signalk
