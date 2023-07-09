@@ -67,9 +67,9 @@ async function readSerial(writer, { path, signal }) {
                         baudRate: 9600,
                     });
 
-                    signal.on('abort', () => {
+                    signal.onabort = () => {
                         port.close();
-                    })
+                    };
 
                     let closed = false;
                     port.on('close', (reason) => {
