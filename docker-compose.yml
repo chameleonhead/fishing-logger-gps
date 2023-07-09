@@ -2,10 +2,10 @@ version: '3'
 services:
   signalk-server:
     build: ./docker
+    privileged: true
     volumes:
-      - ./docker/config:/root/.signalk
-      - ./packages/signalk-to-awsiotcore:/workspaces/signalk-to-awsiotcore
-      - ./packages/signalk-to-awsiotcore:/root/.signalk/node_modules/signalk-to-awsiotcore
+      - ./docker/config:/opt/signalk
+      - ./packages/signalk-to-awsiotcore:/opt/signalk/node_modules/signalk-to-awsiotcore
     ports:
       - 3000:3000
       - 8375:8375
