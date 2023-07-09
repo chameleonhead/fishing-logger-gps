@@ -3,4 +3,11 @@ services:
   signalk-server:
     build: ./docker
     volumes:
-    - ./docker/config:/root/.signalk
+      - ./docker/config:/root/.signalk
+      - ./packages/signalk-to-awsiotcore:/workspaces/signalk-to-awsiotcore
+      - ./packages/signalk-to-awsiotcore:/root/.signalk/node_modules/signalk-to-awsiotcore
+    ports:
+      - 3000:3000
+      - 8375:8375
+      - 10110:10110
+
