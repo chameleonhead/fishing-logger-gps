@@ -1,18 +1,18 @@
-#/bin/bash
+#/bin/sh
 
 set -e
 
-if [ $(whereis sudo | grep ' ' -ic) == 0 ]; then 
+if [ $(whereis sudo | grep ' ' -ic) = 0 ]; then 
   apt update && apt install -y sudo
 fi
 
-if [ $(whereis node | grep ' ' -ic) == 0 ]; then 
+if [ $(whereis node | grep ' ' -ic) = 0 ]; then 
   curl -sL https://deb.nodesource.com/setup_18.x | bash - \
       && apt install -y gcc g++ make nodejs \
       && npm install -g npm@latest
 fi
 
-if [ $(whereis signalk-server | grep ' ' -ic) == 0 ]; then 
+if [ $(whereis signalk-server | grep ' ' -ic) = 0 ]; then 
   apt update \
       && apt install -y libnss-mdns avahi-utils libavahi-compat-libdnssd-dev \
       && npm install -g signalk-server
