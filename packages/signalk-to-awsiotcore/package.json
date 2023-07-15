@@ -2,8 +2,11 @@
   "name": "signalk-to-awsiotcore",
   "version": "0.0.1",
   "description": "SignalK plugin to send data to AWS IoT Core",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Yuto Nagano",
@@ -11,5 +14,11 @@
   "keywords": [
     "signalk-node-server-plugin",
     "signalk-category-cloud"
-  ]
+  ],
+  "dependencies": {
+    "aws-iot-device-sdk": "^2.2.12"
+  },
+  "devDependencies": {
+    "typescript": "^5.1.6"
+  }
 }
