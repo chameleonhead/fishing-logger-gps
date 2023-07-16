@@ -1,4 +1,4 @@
-import { Plugin, ServerAPI } from '@signalk/server-api'
+import { Plugin, ResourcesApi, ServerAPI } from '@signalk/server-api'
 import * as awsIot from 'aws-iot-device-sdk';
 
 type SignalKToAWSIoTCoreOptions = {
@@ -7,6 +7,7 @@ type SignalKToAWSIoTCoreOptions = {
   private_key: string;
   client_cert: string;
   ca_cert: string;
+  send_intervals: number
 }
 
 const CONFIG_SCHEMA = {
@@ -21,44 +22,29 @@ const CONFIG_SCHEMA = {
     host: {
       type: 'string',
       format: 'hostname',
-      title: 'AWS IoT endpoint hostname',
+      title: 'AWS IoT endpoint you will use to connect',
     },
     client_id: {
       type: 'string',
-      title: 'AWS IoT client ID (must match Thing name)',
+      title: 'client ID you will use to connect to AWS IoT (name of thing)',
     },
     private_key: {
       type: 'string',
-      title: 'AWS IoT device private key',
+      title: 'private key file associated with the client certificate',
     },
     client_cert: {
       type: 'string',
-      title: 'AWS IoT device certificate',
+      title: 'client certificate',
     },
     ca_cert: {
       type: 'string',
-      title: 'AWS IoT certificate authority',
-      default: `-----BEGIN CERTIFICATE-----
-MIIDQTCCAimgAwIBAgITBmyfz5m/jAo54vB4ikPmljZbyjANBgkqhkiG9w0BAQsF
-ADA5MQswCQYDVQQGEwJVUzEPMA0GA1UEChMGQW1hem9uMRkwFwYDVQQDExBBbWF6
-b24gUm9vdCBDQSAxMB4XDTE1MDUyNjAwMDAwMFoXDTM4MDExNzAwMDAwMFowOTEL
-MAkGA1UEBhMCVVMxDzANBgNVBAoTBkFtYXpvbjEZMBcGA1UEAxMQQW1hem9uIFJv
-b3QgQ0EgMTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBALJ4gHHKeNXj
-ca9HgFB0fW7Y14h29Jlo91ghYPl0hAEvrAIthtOgQ3pOsqTQNroBvo3bSMgHFzZM
-9O6II8c+6zf1tRn4SWiw3te5djgdYZ6k/oI2peVKVuRF4fn9tBb6dNqcmzU5L/qw
-IFAGbHrQgLKm+a/sRxmPUDgH3KKHOVj4utWp+UhnMJbulHheb4mjUcAwhmahRWa6
-VOujw5H5SNz/0egwLX0tdHA114gk957EWW67c4cX8jJGKLhD+rcdqsq08p8kDi1L
-93FcXmn/6pUCyziKrlA4b9v7LWIbxcceVOF34GfID5yHI9Y/QCB/IIDEgEw+OyQm
-jgSubJrIqg0CAwEAAaNCMEAwDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMC
-AYYwHQYDVR0OBBYEFIQYzIU07LwMlJQuCFmcx7IQTgoIMA0GCSqGSIb3DQEBCwUA
-A4IBAQCY8jdaQZChGsV2USggNiMOruYou6r4lK5IpDB/G/wkjUu0yKGX9rbxenDI
-U5PMCCjjmCXPI6T53iHTfIUJrU6adTrCC2qJeHZERxhlbI1Bjjt/msv0tadQ1wUs
-N+gDS63pYaACbvXy8MWy7Vu33PqUXHeeE6V/Uq2V8viTO96LXFvKWlJbYK8U90vv
-o/ufQJVtMVT8QtPHRh8jrdkPSHCa2XV4cdFyQzR1bldZwgJcJmApzyMZFo6IQ6XU
-5MsI+yMRQ+hDKXJioaldXgjUkK642M4UwtBV8ob2xJNDd2ZhwLnoQdeXeGADbkpy
-rqXRfboQnoZsG4q5WTP468SQvvG5
------END CERTIFICATE-----`,
+      title: 'CA certificate',
     },
+    send_intervals: {
+      type: 'number',
+      title: 'interval seconds to send data to AWS IoT',
+      default: 30,
+    }
   }
 }
 
@@ -72,13 +58,11 @@ const CONFIG_UISCHEMA = {
   ca_cert: {
     'ui:widget': 'textarea',
   },
-  send_states: {
-    'ui:widget': 'checkboxes',
-  },
 }
 
-export = function (server: ServerAPI) {
-  var plugin: Plugin = {
+export = function (server: ServerAPI & { streambundle: { getAvailablePaths(): string[] } }) {
+  let interval: ReturnType<typeof setTimeout> | null = null;
+  const plugin: Plugin = {
     id: "signalk-to-awsiotcore",
     name: "SignalK AWS IoT Core Plugin",
 
@@ -92,19 +76,68 @@ export = function (server: ServerAPI) {
         clientCert: Buffer.from(options.client_cert),
         caCert: Buffer.from(options.ca_cert),
         clientId: options.client_id,
-        host: options.host
+        host: options.host,
+        keepalive: 100,
+        debug: true,
       });
 
+      interval = setInterval(() => {
+        server.debug("Interval");
+        let hasValue = false;
+        const uuid = server.getSelfPath("uuid");
+        if (!uuid) {
+          server.debug("uuid is not set.")
+          return;
+        }
+        const availablePaths = server.streambundle.getAvailablePaths();
+        server.debug("Available Paths:" + JSON.stringify(availablePaths));
+        const message = {} as any;
+        for (const path of availablePaths) {
+          try {
+            const value = server.getSelfPath(path);
+            if (typeof value !== 'undefined') {
+              message[path] = typeof value.value === 'undefined' ? value : value.value;
+              hasValue = true;
+            }
+          } catch (e) {
+            server.error('error while getting path :' + path);
+          }
+        }
+        if (!hasValue) {
+          return;
+        }
+        device.publish(`ships/${options.client_id}/state`, JSON.stringify(message), { qos: 1 });
+        server.debug(`Published message to topic ship/${options.client_id}/state:  ${JSON.stringify(message)}`);
+      }, (options.send_intervals || 30) * 1000)
+
       device.on('connect', () => {
-        server.debug("Connect");
+        server.debug("Device connected.");
+        server.setPluginStatus("Online");
+      })
+      device.on('close', function () {
+        server.setPluginStatus("Offline");
+        server.debug("Device closed.");
+      });
+      device.on('offline', () => {
+        server.debug("Device disconnected.");
+        server.setPluginStatus("Offline");
+      })
+      device.on('reconnect', () => {
+        server.debug("Device reconnected.");
+        server.setPluginStatus("Online");
       })
       device.on('message', (topic, payload) => {
         server.debug(`Message ${topic}:${payload.toString()}`);
       });
+      device.on('error', (error) => {
+        server.error(typeof error === 'string' ? error : error.message);
+      })
     },
 
     stop: function () {
-      // Here we put logic we need when the plugin stops
+      if (interval != null) {
+        clearInterval(interval);
+      }
       server.debug("Plugin stopped");
     },
 
