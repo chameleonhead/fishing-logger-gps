@@ -5,9 +5,10 @@ services:
     privileged: true
     volumes:
       - ./docker/config:/opt/signalk
-      - ./packages/signalk-to-awsiotcore:/opt/signalk/node_modules/signalk-to-awsiotcore
+      - ./packages/signalk-plugin-fishing-logger:/opt/signalk/node_modules/signalk-plugin-fishing-logger
     ports:
       - 3000:3000
       - 8375:8375
       - 10110:10110
-
+    environment:
+      FISHING_LOGGER_ENDPOINT: https://7i11vuoghc.execute-api.ap-northeast-1.amazonaws.com

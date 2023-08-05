@@ -1,0 +1,29 @@
+{
+  "name": "signalk-plugin-fishing-logger",
+  "version": "0.0.1",
+  "description": "SignalK plugin for Fishing Logger",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Yuto Nagano",
+  "license": "MIT",
+  "keywords": [
+    "signalk-node-server-plugin",
+    "signalk-category-utility",
+    "signalk-category-hidden"
+  ],
+  "dependencies": {
+    "aws-iot-device-sdk": "^2.2.12",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@signalk/server-api": "^2.1.0",
+    "@types/aws-iot-device-sdk": "^2.2.4",
+    "prettier": "^3.0.0",
+    "typescript": "^5.1.6"
+  }
+}
