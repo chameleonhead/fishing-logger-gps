@@ -1,7 +1,7 @@
 import fetch from 'node-fetch'
 import { generateCSR } from './csr-utils';
 
-export default async function activate(ship_id: string) {
+export async function activate(ship_id: string) {
   const endpoint = process.env.FISHING_LOGGER_ENDPOINT || 'https://fishing-logger.com';
   const url = `${endpoint}/api/ship/${ship_id}/activate`;
   const { csrData, privateKey } = generateCSR(ship_id);

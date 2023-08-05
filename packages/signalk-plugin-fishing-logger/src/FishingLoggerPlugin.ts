@@ -1,7 +1,7 @@
 import * as awsIot from 'aws-iot-device-sdk';
 import { Plugin, ServerAPI } from "@signalk/server-api";
+import { activate } from './activate';
 import fs from 'fs/promises';
-import activate from './activate';
 
 const CONFIG_SCHEMA = {
   type: 'object',
