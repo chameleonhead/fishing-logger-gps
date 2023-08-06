@@ -17,8 +17,7 @@
     "signalk-category-hidden"
   ],
   "dependencies": {
-    "aws-iot-device-sdk": "^2.2.12",
-    "node-fetch": "^3.3.2"
+    "aws-iot-device-sdk": "^2.2.12"
   },
   "devDependencies": {
     "@signalk/server-api": "^2.1.0",
