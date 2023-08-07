@@ -3,6 +3,7 @@ import * as awsIot from "aws-iot-device-sdk";
 import { Plugin, ServerAPI } from "@signalk/server-api";
 import { activate } from "./activate.js";
 import { createPKCS10 } from "./crypto-utils.js";
+import { restructData } from "./message-utils.js";
 
 const CONFIG_SCHEMA = {
   type: "object",
@@ -31,7 +32,7 @@ export class FishingLoggerPlugin implements Plugin {
     private server: ServerAPI & {
       streambundle: { getAvailablePaths(): string[] };
     },
-  ) {}
+  ) { }
 
   async start(config: object, restart: (newConfiguration: object) => void) {
     this.running = true;
@@ -132,7 +133,7 @@ export class FishingLoggerPlugin implements Plugin {
     });
 
     this.interval = setInterval(() => {
-      server.debug("Interval");
+      server.debug("processing interval");
       let hasValue = false;
       const uuid = server.getSelfPath("uuid");
       if (!uuid) {
@@ -140,7 +141,6 @@ export class FishingLoggerPlugin implements Plugin {
         return;
       }
       const availablePaths = server.streambundle.getAvailablePaths();
-      server.debug("Available Paths:" + JSON.stringify(availablePaths));
       const message = {} as any;
       for (const path of availablePaths) {
         try {
@@ -157,15 +157,15 @@ export class FishingLoggerPlugin implements Plugin {
       if (!hasValue) {
         return;
       }
+      const sendData = restructData(message);
       device.publish(
         `ships/${configData!.client_id}/state`,
-        JSON.stringify(message),
+        JSON.stringify(sendData),
         { qos: 1 },
       );
       server.debug(
-        `Published message to topic ship/${
-          configData!.client_id
-        }/state:  ${JSON.stringify(message)}`,
+        `Published message to topic ship/${configData!.client_id
+        }/state:  ${JSON.stringify(sendData)}`,
       );
     }, 30000);
 
