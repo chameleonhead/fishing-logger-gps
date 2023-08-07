@@ -4,6 +4,7 @@ import { Plugin, ServerAPI } from "@signalk/server-api";
 import { activate } from "./activate.js";
 import { createPKCS10 } from "./crypto-utils.js";
 import { restructData } from "./message-utils.js";
+import { getConfig } from "./get-config.js";
 
 const CONFIG_SCHEMA = {
   type: "object",
@@ -50,21 +51,20 @@ export class FishingLoggerPlugin implements Plugin {
 
     await fs.mkdir(pluginDir, { recursive: true });
 
-    let configData = null as {
-      iot_endpoint: string;
+    let iotCredential = null as {
       client_id: string;
       certificate: string;
       ca_certificate: string;
     } | null;
     try {
       const configString = await fs.readFile(configPath, "utf8");
-      configData = JSON.parse(configString);
+      iotCredential = JSON.parse(configString);
     } catch (e) {
       server.debug("error while reading config file: " + e);
-      configData = null;
+      iotCredential = null;
     }
 
-    if (configData === null) {
+    if (iotCredential === null) {
       server.debug("ship not activated");
       let retryCount = 0;
 
@@ -94,15 +94,15 @@ export class FishingLoggerPlugin implements Plugin {
             "https://7i11vuoghc.execute-api.ap-northeast-1.amazonaws.com";
           server.debug("using endpoint: " + endpoint);
 
-          configData = await activate(endpoint, options.ship_id, csr);
+          iotCredential = await activate(endpoint, options.ship_id, csr);
         } catch (e) {
           server.error("error while activation: " + e);
         }
-        if (configData !== null) {
+        if (iotCredential !== null) {
           server.debug(
-            "ship activation succeeded: " + JSON.stringify(configData),
+            "ship activation succeeded: " + JSON.stringify(iotCredential),
           );
-          await fs.writeFile(configPath, JSON.stringify(configData), "utf8");
+          await fs.writeFile(configPath, JSON.stringify(iotCredential), "utf8");
           break;
         }
         if (retryCount >= 3) {
@@ -115,8 +115,44 @@ export class FishingLoggerPlugin implements Plugin {
         server.debug("finished running.");
         return;
       }
-    } else {
-      server.debug(JSON.stringify(configData));
+    }
+
+    server.debug("create connection...");
+    let iotConfig = null as {
+      iot_endpoint: string;
+      topic_prefix: string;
+    } | null;
+    let retryCount = 0;
+
+    while (this.running) {
+      retryCount++;
+
+      try {
+        const endpoint =
+          process.env.FISHING_LOGGER_ENDPOINT ||
+          "https://7i11vuoghc.execute-api.ap-northeast-1.amazonaws.com";
+        server.debug("using endpoint: " + endpoint);
+
+        iotConfig = await getConfig(endpoint, options.ship_id);
+      } catch (e) {
+        server.error("error while get config: " + e);
+      }
+      if (iotConfig !== null) {
+        server.debug(
+          "connection creation succeeded: " + JSON.stringify(iotConfig),
+        );
+        break;
+      }
+      if (retryCount >= 3) {
+        server.error("connection creation failed.");
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+    }
+
+    if (!this.running) {
+      server.debug("finished running.");
+      return;
     }
 
     // Here we put our plugin logic
@@ -124,49 +160,55 @@ export class FishingLoggerPlugin implements Plugin {
 
     const device = new awsIot.device({
       keyPath: privateKeyPath,
-      clientCert: Buffer.from(configData!.certificate),
-      caCert: Buffer.from(configData!.ca_certificate),
-      clientId: configData!.client_id,
-      host: configData!.iot_endpoint,
+      clientCert: Buffer.from(iotCredential!.certificate),
+      caCert: Buffer.from(iotCredential!.ca_certificate),
+      clientId: iotCredential!.client_id,
+      host: iotConfig!.iot_endpoint,
       keepalive: 100,
       debug: true,
     });
 
+    const topicName = `${iotConfig?.topic_prefix || ''}ships/${options.ship_id}/state`
     this.interval = setInterval(() => {
-      server.debug("processing interval");
-      let hasValue = false;
-      const uuid = server.getSelfPath("uuid");
-      if (!uuid) {
-        server.debug("uuid is not set.");
-        return;
-      }
-      const availablePaths = server.streambundle.getAvailablePaths();
-      const message = {} as any;
-      for (const path of availablePaths) {
-        try {
-          const value = server.getSelfPath(path);
-          if (typeof value !== "undefined") {
-            message[path] =
-              typeof value.value === "undefined" ? value : value.value;
-            hasValue = true;
-          }
-        } catch (e) {
-          server.error("error while getting path :" + path);
+      try {
+        server.debug("processing interval");
+        let hasValue = false;
+        const uuid = server.getSelfPath("uuid");
+        if (!uuid) {
+          server.debug("uuid is not set.");
+          return;
         }
+        const availablePaths = server.streambundle.getAvailablePaths();
+        const message = {} as any;
+        for (const path of availablePaths) {
+          try {
+            const value = server.getSelfPath(path);
+            if (typeof value !== "undefined") {
+              message[path] =
+                typeof value.value === "undefined" ? value : value.value;
+              hasValue = true;
+            }
+          } catch (e) {
+            server.error("error while getting path :" + path);
+          }
+        }
+        if (!hasValue) {
+          server.debug("no data. skipping.");
+          return;
+        }
+        const sendData = restructData(message);
+        device.publish(
+          topicName,
+          JSON.stringify(sendData),
+          { qos: 1 },
+        );
+        server.debug(
+          `Published message to topic ${topicName}:  ${JSON.stringify(sendData)}`,
+        );
+
+      } catch (e) {
+        server.error("" + e);
       }
-      if (!hasValue) {
-        return;
-      }
-      const sendData = restructData(message);
-      device.publish(
-        `ships/${configData!.client_id}/state`,
-        JSON.stringify(sendData),
-        { qos: 1 },
-      );
-      server.debug(
-        `Published message to topic ship/${configData!.client_id
-        }/state:  ${JSON.stringify(sendData)}`,
-      );
     }, 30000);
 
     device.on("connect", () => {
